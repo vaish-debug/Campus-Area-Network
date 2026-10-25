@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusNet — Campus Network Management System | B.Tech PBL Project</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        bordercol: '#334155',
+                        accentteal: '#06b6d4',
+                        accentblue: '#3b82f6',
+                        accentgreen: '#10b981',
+                        accentred: '#ef4444',
+                        accentyellow: '#f59e0b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for Network Monitoring -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }
+        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); }
+        .glow-teal { box-shadow: 0 0 20px rgba(6, 182, 212, 0.15); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .animate-pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-darkbg text-slate-100 selection:bg-cyan-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="h-16 border-b border-bordercol bg-cardbg/80 backdrop-blur sticky top-0 z-50 flex items-center justify-between px-4 lg:px-8">
+        <div class="flex items-center space-x-3">
+            <button id="sidebar-toggle" class="lg:hidden text-slate-400 hover:text-white focus:outline-none p-2 rounded-lg hover:bg-slate-800">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+            <div class="flex items-center space-x-2">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-network-wired text-white text-lg"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">CampusNet</span>
+                    <span class="text-xs px-2 py-0.5 ml-2 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-mono hidden sm:inline-block">v2.4 PBL Lab</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <div class="hidden md:flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-bordercol text-xs font-mono">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-slate-300">Packet Tracer Simulator: <strong class="text-emerald-400">Active (Connected)</strong></span>
+            </div>
+            <button onclick="triggerGlobalSim()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-md transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-bolt"></i>
+                <span class="hidden sm:inline">Run Stress Test</span>
+            </button>
+            <div class="relative">
+                <button onclick="toggleNotifications()" class="relative text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800">
+                    <i class="fa-regular fa-bell text-lg"></i>
+                    <span id="notif-badge" class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+                <!-- Notification Dropdown -->
+                <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-cardbg border border-bordercol rounded-xl shadow-2xl p-4 z-50">
+                    <div class="flex justify-between items-center pb-2 border-b border-bordercol mb-3">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Simulated Network Alerts</span>
+                        <span class="text-xs text-cyan-400 cursor-pointer hover:underline" onclick="clearAlerts()">Clear all</span>
+                    </div>
+                    <div id="notif-list" class="space-y-2 max-h-64 overflow-y-auto text-xs">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="w-64 bg-cardbg border-r border-bordercol flex flex-col transition-all duration-300 fixed lg:static inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0 pt-16 lg:pt-0">
+            <div class="p-4 border-b border-bordercol">
+                <div class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">Project</div>
+                <div class="font-semibold text-sm text-slate-200">Campus Area Network</div>
+                <div class="text-xs text-slate-400 mt-0.5">B.Tech Cyber Security PBL</div>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+                <a href="#dashboard" onclick="switchTab('dashboard')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" data-target="dashboard">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#topology" onclick="switchTab('topology')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="topology">
+                    <i class="fa-solid fa-network-wired w-5 text-center"></i>
+                    <span>Interactive Topology</span>
+                </a>
+                <a href="#departments" onclick="switchTab('departments')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="departments">
+                    <i class="fa-solid fa-building-user w-5 text-center"></i>
+                    <span>Departments</span>
+                </a>
+                <a href="#ipam" onclick="switchTab('ipam')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="ipam">
+                    <i class="fa-solid fa-address-book w-5 text-center"></i>
+                    <span>IPAM & DHCP</span>
+                </a>
+                <a href="#monitoring" onclick="switchTab('monitoring')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="monitoring">
+                    <i class="fa-solid fa-chart-line w-5 text-center"></i>
+                    <span>Network Monitoring</span>
+                </a>
+                <a href="#connectivity" onclick="switchTab('connectivity')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="connectivity">
+                    <i class="fa-solid fa-terminal w-5 text-center"></i>
+                    <span>Ping & Traceroute</span>
+                </a>
+                <a href="#security" onclick="switchTab('security')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="security">
+                    <i class="fa-solid fa-shield-halved w-5 text-center"></i>
+                    <span>Security & ACLs</span>
+                </a>
+                <a href="#configs" onclick="switchTab('configs')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="configs">
+                    <i class="fa-solid fa-code w-5 text-center"></i>
+                    <span>Cisco IOS Configs</span>
+                </a>
+                <a href="#docs" onclick="switchTab('docs')" class="nav-link flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-target="docs">
+                    <i class="fa-solid fa-book-open w-5 text-center"></i>
+                    <span>Project Documentation</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-bordercol">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-bordercol text-xs space-y-2">
+                    <div class="flex justify-between text-slate-400">
+                        <span>Packet Tracer File:</span>
+                        <span class="text-cyan-400 font-mono">campus_net.pkt</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Base Network:</span>
+                        <span class="text-slate-200 font-mono">192.168.10.0/24</span>
+                    </div>
+                    <button onclick="downloadReport()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-semibold py-1.5 px-3 rounded-lg border border-cyan-500/30 transition flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-download text-xs"></i>
+                        <span>Download Report</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-4 lg:p-8 bg-darkbg">
+
+            <!-- TAB 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Campus Network Dashboard</h1>
+                        <p class="text-sm text-slate-400 mt-1">Real-time simulation status of the multi-department Cisco Packet Tracer Campus Area Network.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <i class="fa-solid fa-circle text-[8px] mr-1.5 animate-pulse"></i> System Status: Optimal
+                        </span>
+                        <button onclick="resetSimulationState()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-bordercol transition flex items-center space-x-1">
+                            <i class="fa-solid fa-rotate-right"></i><span>Reset Lab</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Metric Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="glass-panel p-5 rounded-2xl glow-blue relative overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Network Devices</p>
+                                <h3 class="text-3xl font-extrabold text-white mt-2" id="kpi-total-devices">38</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                                <i class="fa-solid fa-server text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center text-xs text-emerald-400 font-medium">
+                            <i class="fa-solid fa-arrow-up mr-1"></i><span>100% Reachability</span>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl glow-teal relative overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Routers & Switches</p>
+                                <h3 class="text-3xl font-extrabold text-white mt-2" id="kpi-routers-switches">12</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                                <i class="fa-solid fa-network-wired text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center text-xs text-slate-400">
+                            <span>Core, Distribution & Access Layers</span>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Connected Endpoints</p>
+                                <h3 class="text-3xl font-extrabold text-white mt-2" id="kpi-endpoints">26</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                                <i class="fa-solid fa-desktop text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center text-xs text-emerald-400 font-medium">
+                            <i class="fa-solid fa-check mr-1"></i><span>PCs, Laptops, Printers, APs</span>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Campus Departments</p>
+                                <h3 class="text-3xl font-extrabold text-white mt-2" id="kpi-departments">8</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                                <i class="fa-solid fa-building-columns text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center text-xs text-purple-400 font-medium">
+                            <span>VLAN Segregated (VLAN 10 - 80)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid: Topology Quick View & Recent Events -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Topology Mini Card -->
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl flex flex-col justify-between">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-white">Campus Backbone Overview</h2>
+                                <p class="text-xs text-slate-400">Star-Extended Tree Topology anchored by Core Router (Cisco 2911)</p>
+                            </div>
+                            <button onclick="switchTab('topology')" class="text-xs text-cyan-400 hover:underline flex items-center space-x-1">
+                                <span>Expand Topology</span><i class="fa-solid fa-arrow-right text-[10px]"></i>
+                            </button>
+                        </div>
+                        <div class="bg-slate-900/90 rounded-xl p-4 border border-bordercol h-72 flex flex-col items-center justify-center relative overflow-hidden">
+                            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                            <!-- Mini Topology Graphic representation -->
+                            <div class="flex flex-col items-center space-y-4 z-10 w-full max-w-md">
+                                <div class="bg-blue-600/20 border border-blue-500 px-4 py-2 rounded-xl text-center text-xs font-mono text-cyan-300 w-48 shadow-lg">
+                                    <i class="fa-solid fa-globe mr-1"></i> ISP Cloud / Internet (PT)
+                                </div>
+                                <div class="w-0.5 h-6 bg-cyan-500/50"></div>
+                                <div class="bg-cyan-600/20 border border-cyan-400 px-4 py-2.5 rounded-xl text-center text-xs font-mono text-white w-56 shadow-lg">
+                                    <i class="fa-solid fa-server mr-1"></i> Core Router (Cisco 2911)
+                                </div>
+                                <div class="w-full flex justify-between items-center px-6">
+                                    <div class="h-0.5 flex-1 bg-cyan-500/40"></div>
+                                    <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping mx-2"></div>
+                                    <div class="h-0.5 flex-1 bg-cyan-500/40"></div>
+                                </div>
+                                <div class="grid grid-cols-4 gap-2 w-full text-center">
+                                    <div class="bg-slate-800 border border-bordercol p-2 rounded-lg text-[10px] font-mono text-slate-300">Admin Sw</div>
+                                    <div class="bg-slate-800 border border-bordercol p-2 rounded-lg text-[10px] font-mono text-slate-300">CS Dept</div>
+                                    <div class="bg-slate-800 border border-bordercol p-2 rounded-lg text-[10px] font-mono text-slate-300">Cyber Sec</div>
+                                    <div class="bg-slate-800 border border-bordercol p-2 rounded-lg text-[10px] font-mono text-slate-300">Servers</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Events Log -->
+                    <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-lg font-bold text-white">Live Event Log</h2>
+                                <span class="text-[10px] font-mono bg-slate-800 px-2 py-1 rounded text-slate-400 border border-bordercol">Syslog</span>
+                            </div>
+                            <div id="dashboard-event-log" class="space-y-3 max-h-72 overflow-y-auto text-xs font-mono">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <div class="pt-4 border-t border-bordercol mt-4">
+                            <button onclick="switchTab('monitoring')" class="w-full bg-slate-800 hover:bg-slate-700 text-xs font-semibold py-2 rounded-lg border border-bordercol text-slate-200 transition">
+                                View Full Network Logs
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Department Status Quick Grid -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h2 class="text-lg font-bold text-white mb-4">Departmental Node Status</h2>
+                    <div id="dept-status-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: INTERACTIVE NETWORK TOPOLOGY -->
+            <section id="tab-topology" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Interactive Network Topology</h1>
+                        <p class="text-sm text-slate-400 mt-1">Visual map of Cisco Packet Tracer devices. Click any node to inspect configuration, IP, VLAN, and status.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="simulateLinkFailure()" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs px-3 py-2 rounded-lg transition font-medium flex items-center space-x-1.5">
+                            <i class="fa-solid fa-triangle-exclamation"></i><span>Simulate Link Cut</span>
+                        </button>
+                        <button onclick="resetTopology()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-bordercol transition">
+                            <i class="fa-solid fa-rotate-right mr-1"></i> Reset Topology
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <!-- Canvas / SVG Area -->
+                    <div class="lg:col-span-3 glass-panel p-4 rounded-2xl relative min-h-[500px] flex flex-col">
+                        <div class="absolute top-4 left-4 z-10 flex space-x-2 bg-slate-900/80 p-2 rounded-lg border border-bordercol text-xs font-mono">
+                            <span class="flex items-center text-emerald-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i> Active Link</span>
+                            <span class="flex items-center text-red-400 ml-3"><i class="fa-solid fa-circle text-[8px] mr-1"></i> Severed Link</span>
+                        </div>
+                        <div class="absolute bottom-4 right-4 z-10 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-bordercol text-xs text-slate-400">
+                            Tip: Click on nodes to view detailed Cisco specs
+                        </div>
+
+                        <!-- SVG Topology Graph -->
+                        <div class="flex-1 w-full h-[450px] bg-slate-950/60 rounded-xl border border-bordercol relative overflow-hidden flex items-center justify-center">
+                            <svg id="topology-svg" class="w-full h-full cursor-grab">
+                                <!-- Rendered dynamically by JS -->
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Inspector Sidebar -->
+                    <div class="glass-panel p-5 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center pb-3 border-b border-bordercol mb-4">
+                                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Device Inspector</h2>
+                                <span id="inspector-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">Select Node</span>
+                            </div>
+                            
+                            <div id="node-inspector-content" class="space-y-4 text-xs font-mono">
+                                <div class="text-center py-12 text-slate-500">
+                                    <i class="fa-solid fa-mouse-pointer text-3xl mb-2 text-slate-600"></i>
+                                    <p class="font-sans">Click any node in the topology diagram to inspect its Packet Tracer configuration.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-bordercol mt-4">
+                            <div class="text-[11px] text-slate-400 font-sans">
+                                <strong>Packet Tracer Model:</strong> Real Cisco 2911 Router, 2960 Switch, and PT-EndDevices.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: DEPARTMENT MANAGEMENT -->
+            <section id="tab-departments" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Campus Departments & VLANs</h1>
+                        <p class="text-sm text-slate-400 mt-1">Logical segmentation of the campus into 8 isolated VLANs with dedicated subnets.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="dept-search" oninput="filterDepartments()" placeholder="Search department..." class="bg-slate-900 border border-bordercol rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <!-- Department Cards Grid -->
+                <div id="departments-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- TAB 4: IPAM & DHCP MANAGEMENT -->
+            <section id="tab-ipam" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">IP Address Management & DHCP</h1>
+                        <p class="text-sm text-slate-400 mt-1">Subnet allocation plan based on Class C private network <code class="text-cyan-400">192.168.10.0/24</code> and DHCP scope.</p>
+                    </div>
+                    <button onclick="openSubnetCalculator()" class="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs px-3 py-2 rounded-lg transition font-medium flex items-center space-x-1.5">
+                        <i class="fa-solid fa-calculator"></i><span>Interactive Subnet Calculator</span>
+                    </button>
+                </div>
+
+                <!-- IP Addressing Table -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <h2 class="text-lg font-bold text-white">Campus Subnet Allocation Table</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead>
+                                <tr class="border-b border-bordercol text-slate-400">
+                                    <th class="py-3 px-4">Department</th>
+                                    <th class="py-3 px-4">VLAN ID</th>
+                                    <th class="py-3 px-4">Subnet Network</th>
+                                    <th class="py-3 px-4">Subnet Mask</th>
+                                    <th class="py-3 px-4">Default Gateway</th>
+                                    <th class="py-3 px-4">DHCP Pool Range</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ipam-table-body" class="divide-y divide-bordercol text-slate-300">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- DHCP Leases Table -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <h2 class="text-lg font-bold text-white">Active DHCP Leases (Cisco Router Simulated)</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead>
+                                <tr class="border-b border-bordercol text-slate-400">
+                                    <th class="py-3 px-4">IP Address</th>
+                                    <th class="py-3 px-4">MAC Address</th>
+                                    <th class="py-3 px-4">Department</th>
+                                    <th class="py-3 px-4">Lease Time Remaining</th>
+                                    <th class="py-3 px-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dhcp-leases-body" class="divide-y divide-bordercol text-slate-300">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: NETWORK MONITORING -->
+            <section id="tab-monitoring" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Real-Time Network Monitoring</h1>
+                        <p class="text-sm text-slate-400 mt-1">Telemetry simulation tracking bandwidth, latency, and packet loss across core links.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-3 py-1 rounded-lg font-mono">Polling Interval: 3s</span>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h2 class="text-base font-bold text-white mb-4 flex items-center justify-between">
+                            <span>Bandwidth Utilization (Mbps)</span>
+                            <span class="text-xs font-mono text-cyan-400" id="current-bandwidth">42.8 Mbps</span>
+                        </h2>
+                        <div class="h-64 relative">
+                            <canvas id="bandwidthChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h2 class="text-base font-bold text-white mb-4 flex items-center justify-between">
+                            <span>Gateway Latency (ms)</span>
+                            <span class="text-xs font-mono text-emerald-400" id="current-latency">4.2 ms</span>
+                        </h2>
+                        <div class="h-64 relative">
+                            <canvas id="latencyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Event Log -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-white">Comprehensive System Event Log</h2>
+                        <button onclick="clearSystemLogs()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-bordercol text-slate-300">Clear Logs</button>
+                    </div>
+                    <div id="full-event-log" class="space-y-2 max-h-64 overflow-y-auto text-xs font-mono bg-slate-950 p-4 rounded-xl border border-bordercol">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: CONNECTIVITY TESTING (PING / TRACEROUTE) -->
+            <section id="tab-connectivity" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Connectivity Testing (Ping & Traceroute)</h1>
+                        <p class="text-sm text-slate-400 mt-1">Simulate packet transmission across VLANs, checking routing tables and ACL rules.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Control Panel -->
+                    <div class="glass-panel p-6 rounded-2xl space-y-4">
+                        <h2 class="text-lg font-bold text-white">Packet Test Parameters</h2>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Source Device / Department</label>
+                                <select id="ping-source" class="w-full bg-slate-900 border border-bordercol rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+                                    <option value="Admin">Admin PC (192.168.10.10)</option>
+                                    <option value="CS">CS Student PC (192.168.20.15)</option>
+                                    <option value="Cyber">Cyber Security Lab PC (192.168.30.22)</option>
+                                    <option value="Library">Library Workstation (192.168.40.12)</option>
+                                    <option value="Guest">Guest Wi-Fi Laptop (192.168.70.50)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Destination IP / Device</label>
+                                <select id="ping-dest" class="w-full bg-slate-900 border border-bordercol rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+                                    <option value="192.168.60.10">Campus Web Server (192.168.60.10)</option>
+                                    <option value="192.168.60.20">DNS Server (192.168.60.20)</option>
+                                    <option value="192.168.10.1">Admin Gateway (192.168.10.1)</option>
+                                    <option value="192.168.20.10">CS Dept PC (192.168.20.10)</option>
+                                    <option value="192.168.30.10">Cyber Sec Lab (192.168.30.10)</option>
+                                    <option value="8.8.8.8">External ISP / Google DNS (8.8.8.8)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Test Protocol / Tool</label>
+                                <select id="ping-mode" class="w-full bg-slate-900 border border-bordercol rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+                                    <option value="ping">ICMP Ping (4 packets)</option>
+                                    <option value="traceroute">Traceroute (Hop-by-hop)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button onclick="executeConnectivityTest()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-2.5 rounded-xl shadow-lg transition text-xs flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-play"></i><span>Run Packet Test</span>
+                        </button>
+                    </div>
+
+                    <!-- Output Console -->
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center pb-3 border-b border-bordercol mb-4">
+                                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Terminal Output</h2>
+                                <span class="text-xs font-mono text-emerald-400">Ready</span>
+                            </div>
+                            <div id="connectivity-output" class="bg-slate-950 p-4 rounded-xl border border-bordercol font-mono text-xs text-slate-300 h-64 overflow-y-auto space-y-1">
+                                <span class="text-slate-500">Select source and destination, then click "Run Packet Test" to simulate packet routing and ACL inspection...</span>
+                            </div>
+                        </div>
+                        <div class="pt-4 border-t border-bordercol mt-4 text-xs text-slate-400">
+                            <strong>Note:</strong> Guest Wi-Fi traffic destined for Server VLAN (192.168.60.0/24) will automatically fail due to configured Access Control Lists (ACL 100).
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 7: SECURITY & ACLS -->
+            <section id="tab-security" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Network Security & Access Control</h1>
+                        <p class="text-sm text-slate-400 mt-1">Demonstration of VLAN isolation, Port Security, and Extended ACL rules protecting sensitive servers.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl space-y-3">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                            <i class="fa-solid fa-layer-group text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-sm">VLAN Inter-Isolation</h3>
+                        <p class="text-xs text-slate-400">Layer 2 broadcast domains are completely separated. Traffic between departments is strictly routed via Core Router subinterfaces (Router-on-a-Stick).</p>
+                        <div class="pt-2 text-xs font-mono text-emerald-400 flex items-center">
+                            <i class="fa-solid fa-check mr-1.5"></i> Status: Enforced
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl space-y-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                            <i class="fa-solid fa-shield-cat text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-sm">Extended ACL 100</h3>
+                        <p class="text-xs text-slate-400">Denies unauthorized guest Wi-Fi and student subnets from accessing the restricted Server Room VLAN (192.168.60.0/24) while permitting HTTP/DNS.</p>
+                        <div class="pt-2 text-xs font-mono text-emerald-400 flex items-center">
+                            <i class="fa-solid fa-check mr-1.5"></i> Status: Active on Core Router
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl space-y-3">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                            <i class="fa-solid fa-fingerprint text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-sm">Switch Port Security</h3>
+                        <p class="text-xs text-slate-400">Access switch ports restrict MAC address learning to a maximum of 2 devices per port, with violation mode set to <code class="text-cyan-400">restrict</code>.</p>
+                        <div class="pt-2 text-xs font-mono text-emerald-400 flex items-center">
+                            <i class="fa-solid fa-check mr-1.5"></i> Status: Configured on SW-Admin
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Log Table -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <h2 class="text-lg font-bold text-white">Simulated Security Intrusion & ACL Block Log</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead>
+                                <tr class="border-b border-bordercol text-slate-400">
+                                    <th class="py-3 px-4">Timestamp</th>
+                                    <th class="py-3 px-4">Source IP</th>
+                                    <th class="py-3 px-4">Destination IP</th>
+                                    <th class="py-3 px-4">Rule Triggered</th>
+                                    <th class="py-3 px-4">Action Taken</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-bordercol text-slate-300">
+                                <tr>
+                                    <td class="py-3 px-4 text-slate-400">10:42:12 AM</td>
+                                    <td class="py-3 px-4">192.168.70.18 (Guest)</td>
+                                    <td class="py-3 px-4">192.168.60.10 (Server)</td>
+                                    <td class="py-3 px-4">ACL 100 Deny IP</td>
+                                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30">Dropped</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 text-slate-400">10:38:05 AM</td>
+                                    <td class="py-3 px-4">192.168.20.45 (CS Lab)</td>
+                                    <td class="py-3 px-4">192.168.10.5 (Admin PC)</td>
+                                    <td class="py-3 px-4">ACL 100 Inter-VLAN</td>
+                                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30">Dropped</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 text-slate-400">10:15.22 AM</td>
+                                    <td class="py-3 px-4">192.168.30.10 (Cyber Sec)</td>
+                                    <td class="py-3 px-4">192.168.60.20 (DNS)</td>
+                                    <td class="py-3 px-4">Permit TCP/UDP</td>
+                                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Forwarded</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 8: CISCO IOS CONFIGURATION REFERENCE -->
+            <section id="tab-configs" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Cisco IOS Configuration Reference</h1>
+                        <p class="text-sm text-slate-400 mt-1">Beginner-friendly Cisco Packet Tracer CLI commands for routers, switches, VLANs, DHCP, and security.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Config Box 1: Core Router Setup -->
+                    <div class="glass-panel p-6 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-white text-sm flex items-center space-x-2">
+                                <i class="fa-solid fa-server text-cyan-400"></i>
+                                <span>1. Core Router (Router-on-a-Stick & DHCP Setup)</span>
+                            </h3>
+                            <button onclick="copyCode('code-router')" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-bordercol text-cyan-400 transition flex items-center space-x-1">
+                                <i class="fa-regular fa-copy"></i><span>Copy Commands</span>
+                            </button>
+                        </div>
+                        <pre id="code-router" class="bg-slate-950 p-4 rounded-xl border border-bordercol font-mono text-xs text-cyan-300 overflow-x-auto"><code>enable
+configure terminal
+hostname Core-Router
+
+! Enable GigabitEthernet 0/0 subinterfaces for Inter-VLAN Routing
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+ description Admin VLAN
+
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+ description CS Dept VLAN
+
+interface GigabitEthernet0/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.30.1 255.255.255.0
+ description Cyber Security VLAN
+
+interface GigabitEthernet0/0.60
+ encapsulation dot1Q 60
+ ip address 192.168.60.1 255.255.255.0
+ description Server Room VLAN
+
+no shutdown
+
+! DHCP Server Configuration
+ip dhcp excluded-address 192.168.10.1 192.168.10.10
+ip dhcp pool ADMIN_POOL
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.1
+ dns-server 192.168.60.20
+
+ip dhcp pool CS_POOL
+ network 192.168.20.0 255.255.255.0
+ default-router 192.168.20.1
+ dns-server 192.168.60.20
+exit</code></pre>
+                    </div>
+
+                    <!-- Config Box 2: Switch Configuration & VLANs -->
+                    <div class="glass-panel p-6 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-white text-sm flex items-center space-x-2">
+                                <i class="fa-solid fa-network-wired text-cyan-400"></i>
+                                <span>2. Layer 2 Switch Configuration (VLANs & Trunks)</span>
+                            </h3>
+                            <button onclick="copyCode('code-switch')" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-bordercol text-cyan-400 transition flex items-center space-x-1">
+                                <i class="fa-regular fa-copy"></i><span>Copy Commands</span>
+                            </button>
+                        </div>
+                        <pre id="code-switch" class="bg-slate-950 p-4 rounded-xl border border-bordercol font-mono text-xs text-cyan-300 overflow-x-auto"><code>enable
+configure terminal
+hostname SW-Admin
+
+! Create VLANs
+vlan 10
+ name Admin
+vlan 20
+ name Computer_Science
+vlan 30
+ name Cyber_Security
+vlan 60
+ name Servers
+
+! Configure Trunk Port connecting to Router
+interface FastEthernet0/1
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30,60
+
+! Configure Access Port for Admin PC
+interface FastEthernet0/2
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+exit</code></pre>
+                    </div>
+
+                    <!-- Config Box 3: Verification Commands -->
+                    <div class="glass-panel p-6 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-white text-sm flex items-center space-x-2">
+                                <i class="fa-solid fa-terminal text-cyan-400"></i>
+                                <span>3. Packet Tracer Verification Commands</span>
+                            </h3>
+                            <button onclick="copyCode('code-verify')" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-bordercol text-cyan-400 transition flex items-center space-x-1">
+                                <i class="fa-regular fa-copy"></i><span>Copy Commands</span>
+                            </button>
+                        </div>
+                        <pre id="code-verify" class="bg-slate-950 p-4 rounded-xl border border-bordercol font-mono text-xs text-cyan-300 overflow-x-auto"><code>! Check VLAN summary on switches
+show vlan brief
+
+! Verify trunk interfaces and native VLANs
+show interfaces trunk
+
+! Check IP routing table on Core Router
+show ip route
+
+! Verify interface status and IP assignments
+show ip interface brief
+
+! Check active DHCP binding pool leases
+show ip dhcp binding</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 9: PROJECT DOCUMENTATION & REPORT -->
+            <section id="tab-docs" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-bordercol">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Project Documentation & Report</h1>
+                        <p class="text-sm text-slate-400 mt-1">Complete B.Tech PBL Project Report on Campus Area Network Design & Implementation.</p>
+                    </div>
+                    <button onclick="downloadReport()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center space-x-2">
+                        <i class="fa-solid fa-download"></i><span>Download Full Report (.txt)</span>
+                    </button>
+                </div>
+
+                <div class="glass-panel p-8 rounded-2xl space-y-8 text-slate-300 text-sm leading-relaxed">
+                    
+                    <!-- 1. Abstract -->
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-bold text-white border-b border-bordercol pb-2">1. Abstract</h2>
+                        <p>
+                            This PBL project presents the comprehensive design, simulation, and deployment of a secure **Campus Area Network (CAN)** using Cisco Packet Tracer. Designed for a modern multi-disciplinary academic institution, the network architecture integrates administrative blocks, computer science and cyber security departments, research labs, libraries, and student Wi-Fi zones into a robust hierarchical topology. Security measures including VLAN segmentation, Inter-VLAN routing, and Access Control Lists (ACLs) are implemented to ensure confidentiality and prevent unauthorized lateral movement across sensitive academic and administrative data stores.
+                        </p>
+                    </div>
+
+                    <!-- 2. Objectives -->
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-bold text-white border-b border-bordercol pb-2">2. Project Objectives</h2>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>Design a scalable hierarchical campus network supporting growth across 8 distinct departments.</li>
+                            <li>Implement VLAN segmentation to isolate broadcast domains and mitigate network congestion.</li>
+                            <li>Configure Inter-VLAN routing using a Cisco Router-on-a-Stick methodology.</li>
+                            <li>Automate IP allocation using built-in Cisco IOS DHCP server pools.</li>
+                            <li>Enforce granular network security using Extended Access Control Lists (ACLs) and port security.</li>
+                            <li>Develop a professional interactive web dashboard (CampusNet) for network telemetry and visualization.</li>
+                        </ul>
+                    </div>
+
+                    <!-- 3. Introduction & Architecture -->
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-bold text-white border-b border-bordercol pb-2">3. Introduction & Network Architecture</h2>
+                        <p>
+                            Modern college campuses require high-speed, reliable, and secure communication infrastructures capable of supporting voice, video, and high-throughput research traffic. The proposed topology follows the Cisco Three-Tier Hierarchical Model (Core, Distribution, and Access layers). The Core Layer consists of high-speed Cisco 2911 routers connecting to the ISP Cloud. The Access Layer utilizes Cisco 2960 Layer 2 switches connected to departmental workstations and wireless access points.
+                        </p>
+                    </div>
+
+                    <!-- 4. Hardware & Software Requirements -->
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-bold text-white border-b border-bordercol pb-2">4. Hardware & Software Requirements</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div class="bg-slate-900/80 p-4 rounded-xl border border-bordercol">
+                                <h4 class="font-bold text-cyan-400 mb-2">Simulation Software</h4>
+                                <ul class="list-disc pl-4 space-y-1 text-xs">
+                                    <li>Cisco Packet Tracer 8.2+</li>
+                                    <li>Modern Web Browser (Chrome, Firefox, Edge)</li>
+                                    <li>VS Code with Live Server (for web prototype)</li>
+                                </ul>
+                            </div>
+                            <div class="bg-slate-900/80 p-4 rounded-xl border border-bordercol">
+                                <h4 class="font-bold text-cyan-400 mb-2">Virtual Network Hardware</h4>
+                                <ul class="list-disc pl-4 space-y-1 text-xs">
+                                    <li>1x Cisco 2911 Modular Core Router</li>
+                                    <li>4x Cisco 2960-24TT Layer 2 Switches</li>
+                                    <li>2x Wireless Access Points (WAP 300N)</li>
+                                    <li>26x Endpoints (PCs, Laptops, Printers, Servers)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Testing & Results -->
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-bold text-white border-b border-bordercol pb-2">5. Testing and Results</h2>
+                        <p>
+                            Thorough validation was conducted using ICMP ping tests and traceroute simulations across VLANs. Results confirmed seamless intra-department communication and authorized server access. Unauthorized attempts by guest Wi-Fi clients to query the server subnet were successfully intercepted and dropped by Extended ACL 100 on the Core Router.
+                        </p>
+                    </div>
+
+                    <!-- 6. Conclusion & Future Enhancements -->
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-bold text-white border-b border-bordercol pb-2">6. Conclusion & Future Enhancements</h2>
+                        <p>
+                            The Campus Area Network project successfully demonstrates enterprise-grade network design principles. Future enhancements include integrating OSPF dynamic routing, deploying redundant HSRP gateway failover, and connecting real SNMP-enabled hardware telemetry using Python and Prometheus/Grafana.
+                        </p>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Subnet Calculator Modal -->
+    <div id="subnet-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg p-6 rounded-2xl space-y-4 relative">
+            <div class="flex justify-between items-center pb-3 border-b border-bordercol">
+                <h3 class="font-bold text-white text-base">Interactive Subnet Calculator</h3>
+                <button onclick="closeSubnetCalculator()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">Network IP Address</label>
+                    <input type="text" id="calc-ip" value="192.168.10.0" class="w-full bg-slate-900 border border-bordercol rounded-xl px-3 py-2 text-white font-mono">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">CIDR Prefix</label>
+                    <select id="calc-cidr" class="w-full bg-slate-900 border border-bordercol rounded-xl px-3 py-2 text-white font-mono">
+                        <option value="24">/24 (255.255.255.0 - 254 Hosts)</option>
+                        <option value="25">/25 (255.255.255.128 - 126 Hosts)</option>
+                        <option value="26">/26 (255.255.255.192 - 62 Hosts)</option>
+                        <option value="28">/28 (255.255.255.240 - 14 Hosts)</option>
+                    </select>
+                </div>
+                <button onclick="calculateSubnet()" class="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-2 rounded-xl transition">Calculate Parameters</button>
+                <div id="calc-result" class="bg-slate-950 p-3 rounded-xl border border-bordercol font-mono text-slate-300 space-y-1">
+                    <span class="text-slate-500">Results will appear here...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- DATASET & STATE ---
+        const campusData = {
+            departments: [
+                { id: 10, name: "Administration", subnet: "192.168.10.0/24", gateway: "192.168.10.1", devices: 4, icon: "fa-building-columns", status: "Optimal" },
+                { id: 20, name: "Computer Science", subnet: "192.168.20.0/24", gateway: "192.168.20.1", devices: 8, icon: "fa-laptop-code", status: "Optimal" },
+                { id: 30, name: "Cyber Security", subnet: "192.168.30.0/24", gateway: "192.168.30.1", devices: 6, icon: "fa-shield-halved", status: "Optimal" },
+                { id: 40, name: "Library", subnet: "192.168.40.0/24", gateway: "192.168.40.1", devices: 5, icon: "fa-book", status: "Optimal" },
+                { id: 50, name: "Faculty Rooms", subnet: "192.168.50.0/24", gateway: "192.168.50.1", devices: 4, icon: "fa-chalkboard-user", status: "Optimal" },
+                { id: 60, name: "Server Room", subnet: "192.168.60.0/24", gateway: "192.168.60.1", devices: 3, icon: "fa-server", status: "Optimal" },
+                { id: 70, name: "Student Wi-Fi", subnet: "192.168.70.0/24", gateway: "192.168.70.1", devices: 5, icon: "fa-wifi", status: "Optimal" },
+                { id: 80, name: "Labs & Printers", subnet: "192.168.80.0/24", gateway: "192.168.80.1", devices: 3, icon: "fa-print", status: "Optimal" }
+            ],
+            nodes: [
+                { id: "isp", name: "ISP Cloud / Internet", ip: "203.0.113.1", role: "Gateway WAN", dept: "Internet", status: "Online", x: 400, y: 50 },
+                { id: "router", name: "Core Router (2911)", ip: "192.168.10.1", role: "Core Gateway", dept: "Backbone", status: "Online", x: 400, y: 150 },
+                { id: "sw-admin", name: "Admin Switch (2960)", ip: "192.168.10.2", role: "L2 Switch", dept: "Administration", status: "Online", x: 150, y: 280 },
+                { id: "sw-cs", name: "CS Switch (2960)", ip: "192.168.20.2", role: "L2 Switch", dept: "Computer Science", status: "Online", x: 300, y: 280 },
+                { id: "sw-cyber", name: "Cyber Sec Switch", ip: "192.168.30.2", role: "L2 Switch", dept: "Cyber Security", status: "Online", x: 500, y: 280 },
+                { id: "sw-server", name: "Server Switch", ip: "192.168.60.2", role: "L2 Switch", dept: "Server Room", status: "Online", x: 650, y: 280 },
+                { id: "pc-admin", name: "Admin PC 01", ip: "192.168.10.10", role: "Endpoint", dept: "Administration", status: "Online", x: 100, y: 400 },
+                { id: "pc-cs", name: "CS Student Workstation", ip: "192.168.20.15", role: "Endpoint", dept: "Computer Science", status: "Online", x: 250, y: 400 },
+                { id: "pc-cyber", name: "Cyber Lab Terminal", ip: "192.168.30.22", role: "Endpoint", dept: "Cyber Security", status: "Online", x: 450, y: 400 },
+                { id: "srv-web", name: "Campus Web Server", ip: "192.168.60.10", role: "Server (HTTP)", dept: "Server Room", status: "Online", x: 600, y: 400 },
+                { id: "srv-dns", name: "Campus DNS Server", ip: "192.168.60.20", role: "Server (DNS)", dept: "Server Room", status: "Online", x: 720, y: 400 }
+            ],
+            logs: [
+                { time: "10:45:12 AM", type: "INFO", message: "Core Router OSPF routing table synchronized successfully." },
+                { time: "10:42:01 AM", type: "WARN", message: "ACL 100 blocked unauthorized packet from 192.168.70.18 to Server VLAN." },
+                { time: "10:30:15 AM", type: "INFO", message: "DHCP lease renewed for CS Student Workstation (192.168.20.15)." },
+                { time: "10:15.00 AM", type: "INFO", message: "Switch SW-Admin port Fa0/2 port-security MAC learning active." }
+            ]
+        };
+
+        let linkSevered = false;
+        let bandwidthChartInstance = null;
+        let latencyChartInstance = null;
+
+        // --- INIT ON LOAD ---
+        window.onload = function() {
+            renderDashboard();
+            renderDepartments();
+            renderIPAM();
+            renderTopologySVG();
+            initCharts();
+            renderEventLogs();
+            
+            // Mobile sidebar toggle
+            document.getElementById('sidebar-toggle').addEventListener('click', () => {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('-translate-x-full');
+            });
+        };
+
+        // --- TAB NAVIGATION ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-link').forEach(el => {
+                el.classList.remove('bg-cyan-500/10', 'text-cyan-400', 'border', 'border-cyan-500/20');
+                el.classList.add('text-slate-300', 'hover:bg-slate-800/80', 'hover:text-white');
+                if(el.getAttribute('data-target') === tabId) {
+                    el.classList.add('bg-cyan-500/10', 'text-cyan-400', 'border', 'border-cyan-500/20');
+                    el.classList.remove('text-slate-300', 'hover:bg-slate-800/80', 'hover:text-white');
+                }
+            });
+
+            // Close mobile sidebar if open
+            if(window.innerWidth < 1024) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
+        }
+
+        // --- DASHBOARD RENDERERS ---
+        function renderDashboard() {
+            const grid = document.getElementById('dept-status-grid');
+            grid.innerHTML = '';
+            campusData.departments.forEach(dept => {
+                grid.innerHTML += `
+                    <div class="bg-slate-900/60 p-4 rounded-xl border border-bordercol flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-cyan-400">
+                                <i class="fa-solid ${dept.icon}"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">${dept.name}</h4>
+                                <span class="text-[10px] font-mono text-slate-400">VLAN ${dept.id} • ${dept.subnet}</span>
+                            </div>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            ${dept.status}
+                        </span>
+                    </div>
+                `;
+            });
+            renderEventLogs();
+        }
+
+        function renderEventLogs() {
+            const dashLog = document.getElementById('dashboard-event-log');
+            const fullLog = document.getElementById('full-event-log');
+            dashLog.innerHTML = '';
+            if(fullLog) fullLog.innerHTML = '';
+
+            campusData.logs.forEach(log => {
+                const color = log.type === 'WARN' ? 'text-amber-400' : 'text-cyan-400';
+                const html = `<div class="flex items-start space-x-2 pb-2 border-b border-bordercol/50">
+                    <span class="text-slate-500">[${log.time}]</span>
+                    <span class="${color}">${log.message}</span>
+                </div>`;
+                dashLog.innerHTML += html;
+                if(fullLog) fullLog.innerHTML += html;
+            });
+        }
+
+        // --- TOPOLOGY SVG RENDERER ---
+        function renderTopologySVG() {
+            const svg = document.getElementById('topology-svg');
+            svg.innerHTML = '';
+
+            // Draw links first
+            const links = [
+                { from: 'isp', to: 'router' },
+                { from: 'router', to: 'sw-admin' },
+                { from: 'router', to: 'sw-cs' },
+                { from: 'router', to: 'sw-cyber' },
+                { from: 'router', to: 'sw-server' },
+                { from: 'sw-admin', to: 'pc-admin' },
+                { from: 'sw-cs', to: 'pc-cs' },
+                { from: 'sw-cyber', to: 'pc-cyber' },
+                { from: 'sw-server', to: 'srv-web' },
+                { from: 'sw-server', to: 'srv-dns' }
+            ];
+
+            links.forEach(l => {
+                const n1 = campusData.nodes.find(n => n.id === l.from);
+                const n2 = campusData.nodes.find(n => n.id === l.to);
+                if(n1 && n2) {
+                    const strokeColor = (linkSevered && l.from === 'router' && l.to === 'sw-admin') ? '#ef4444' : '#06b6d4';
+                    const dashArray = (linkSevered && l.from === 'router' && l.to === 'sw-admin') ? '5,5' : 'none';
+                    svg.innerHTML += `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="${dashArray}" />`;
+                }
+            });
+
+            // Draw nodes
+            campusData.nodes.forEach(n => {
+                let icon = 'fa-server';
+                if(n.role.includes('Switch')) icon = 'fa-network-wired';
+                if(n.role.includes('Endpoint')) icon = 'fa-desktop';
+                if(n.role.includes('Gateway')) icon = 'fa-globe';
+                if(n.role.includes('Server')) icon = 'fa-database';
+
+                svg.innerHTML += `
+                    <g transform="translate(${n.x}, ${n.y})" onclick="inspectNode('${n.id}')" class="cursor-pointer group">
+                        <circle r="22" class="fill-slate-900 stroke-cyan-500 group-hover:stroke-white stroke-2 transition shadow-xl" />
+                        <foreignObject x="-12" y="-12" width="24" height="24">
+                            <div class="flex items-center justify-center text-cyan-400 group-hover:text-white">
+                                <i class="fa-solid ${icon} text-sm"></i>
+                            </div>
+                        </foreignObject>
+                        <text x="0" y="32" text-anchor="middle" class="fill-slate-300 text-[10px] font-mono font-semibold">${n.name}</text>
+                    </g>
+                `;
+            });
+        }
+
+        function inspectNode(id) {
+            const node = campusData.nodes.find(n => n.id === id);
+            if(!node) return;
+            const content = document.getElementById('node-inspector-content');
+            document.getElementById('inspector-badge').innerText = node.id.toUpperCase();
+            content.innerHTML = `
+                <div class="space-y-3">
+                    <div class="bg-slate-900/90 p-3 rounded-xl border border-bordercol space-y-2">
+                        <div class="flex justify-between"><span class="text-slate-400">Device Name:</span> <strong class="text-white">${node.name}</strong></div>
+                        <div class="flex justify-between"><span class="text-slate-400">IP Address:</span> <strong class="text-cyan-400 font-mono">${node.ip}</strong></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Device Role:</span> <strong class="text-slate-200">${node.role}</strong></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Department:</span> <strong class="text-purple-400">${node.dept}</strong></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Port Status:</span> <strong class="text-emerald-400">${linkSevered && node.dept==='Administration' ? 'Down (Severed)' : node.status}</strong></div>
+                    </div>
+                    <div class="bg-slate-900/50 p-3 rounded-xl border border-bordercol text-[11px] text-slate-400">
+                        Cisco IOS Packet Tracer interface configured with running-config backup.
+                    </div>
+                </div>
+            `;
+        }
+
+        function simulateLinkFailure() {
+            linkSevered = !linkSevered;
+            renderTopologySVG();
+            if(linkSevered) {
+                campusData.logs.unshift({ time: new Date().toLocaleTimeString(), type: "WARN", message: "ALERT: Link failure detected between Core Router and Admin Switch!" });
+                showToast("Simulated link failure triggered on Admin department link.");
+            } else {
+                campusData.logs.unshift({ time: new Date().toLocaleTimeString(), type: "INFO", message: "INFO: Link restored between Core Router and Admin Switch." });
+                showToast("Link successfully restored and OSPF converged.");
+            }
+            renderEventLogs();
+        }
+
+        function resetTopology() {
+            linkSevered = false;
+            renderTopologySVG();
+            showToast("Topology reset to optimal state.");
+        }
+
+        // --- DEPARTMENT RENDERING ---
+        function renderDepartments() {
+            const grid = document.getElementById('departments-grid');
+            grid.innerHTML = '';
+            campusData.departments.forEach(dept => {
+                grid.innerHTML += `
+                    <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                                    <i class="fa-solid ${dept.icon}"></i>
+                                </div>
+                                <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-bordercol">VLAN ${dept.id}</span>
+                            </div>
+                            <h3 class="font-bold text-white text-base">${dept.name}</h3>
+                            <p class="text-xs font-mono text-slate-400 mt-1">${dept.subnet}</p>
+                        </div>
+                        <div class="space-y-2 pt-3 border-t border-bordercol text-xs font-mono">
+                            <div class="flex justify-between text-slate-400"><span>Gateway:</span> <span class="text-slate-200">${dept.gateway}</span></div>
+                            <div class="flex justify-between text-slate-400"><span>Connected Nodes:</span> <span class="text-emerald-400">${dept.devices} Devices</span></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function filterDepartments() {
+            const query = document.getElementById('dept-search').value.toLowerCase();
+            const cards = document.querySelectorAll('#departments-grid > div');
+            cards.forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(query) ? 'flex' : 'none';
+            });
+        }
+
+        // --- IPAM & DHCP RENDERING ---
+        function renderIPAM() {
+            const ipamTable = document.getElementById('ipam-table-body');
+            ipamTable.innerHTML = '';
+            campusData.departments.forEach(d => {
+                ipamTable.innerHTML += `
+                    <tr class="hover:bg-slate-800/50 transition">
+                        <td class="py-3 px-4 font-semibold text-white">${d.name}</td>
+                        <td class="py-3 px-4 text-cyan-400">VLAN ${d.id}</td>
+                        <td class="py-3 px-4">${d.subnet}</td>
+                        <td class="py-3 px-4">255.255.255.0</td>
+                        <td class="py-3 px-4">${d.gateway}</td>
+                        <td class="py-3 px-4 text-slate-400">192.168.${d.id}.10 - 100</td>
+                    </tr>
+                `;
+            });
+
+            const dhcpTable = document.getElementById('dhcp-leases-body');
+            dhcpTable.innerHTML = `
+                <tr><td class="py-3 px-4 text-cyan-400">192.168.10.10</td><td class="py-3 px-4 text-slate-400">00:0A:95:9D:68:16</td><td class="py-3 px-4">Administration</td><td class="py-3 px-4">23h 45m</td><td class="py-3 px-4 text-emerald-400">Active Lease</td></tr>
+                <tr><td class="py-3 px-4 text-cyan-400">192.168.20.15</td><td class="py-3 px-4 text-slate-400">00:1B:21:3F:8C:99</td><td class="py-3 px-4">Computer Science</td><td class="py-3 px-4">21h 12m</td><td class="py-3 px-4 text-emerald-400">Active Lease</td></tr>
+                <tr><td class="py-3 px-4 text-cyan-400">192.168.30.22</td><td class="py-3 px-4 text-slate-400">00:40:CA:5E:12:43</td><td class="py-3 px-4">Cyber Security</td><td class="py-3 px-4">24h 00m</td><td class="py-3 px-4 text-emerald-400">Active Lease</td></tr>
+                <tr><td class="py-3 px-4 text-cyan-400">192.168.60.10</td><td class="py-3 px-4 text-slate-400">00:E0:4C:11:22:33</td><td class="py-3 px-4">Server Room</td><td class="py-3 px-4">Static (Reserved)</td><td class="py-3 px-4 text-blue-400">Static Binding</td></tr>
+            `;
+        }
+
+        // --- SUBNET CALCULATOR MODAL ---
+        function openSubnetCalculator() { document.getElementById('subnet-modal').classList.remove('hidden'); }
+        function closeSubnetCalculator() { document.getElementById('subnet-modal').classList.add('hidden'); }
+        function calculateSubnet() {
+            const ip = document.getElementById('calc-ip').value;
+            const cidr = document.getElementById('calc-cidr').value;
+            let hosts = 254;
+            let mask = "255.255.255.0";
+            if(cidr === '25') { hosts = 126; mask = "255.255.255.128"; }
+            if(cidr === '26') { hosts = 62; mask = "255.255.255.192"; }
+            if(cidr === '28') { hosts = 14; mask = "255.255.255.240"; }
+
+            document.getElementById('calc-result').innerHTML = `
+                <div>Network Address: <strong class="text-cyan-400">${ip}</strong></div>
+                <div>Subnet Mask: <strong class="text-white">${mask}</strong></div>
+                <div>Usable Host Range: <strong class="text-emerald-400">192.168.10.1 - 192.168.10.${hosts}</strong></div>
+                <div>Total Usable Hosts: <strong class="text-white">${hosts}</strong></div>
+            `;
+        }
+
+        // --- MONITORING CHARTS ---
+        function initCharts() {
+            const ctxBandwidth = document.getElementById('bandwidthChart').getContext('2d');
+            bandwidthChartInstance = new Chart(ctxBandwidth, {
+                type: 'line',
+                data: {
+                    labels: ['10:40', '10:41', '10:42', '10:43', '10:44', '10:45'],
+                    datasets: [{
+                        label: 'Bandwidth (Mbps)',
+                        data: [32, 45, 38, 52, 48, 42.8],
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#334155' } }, x: { grid: { display: false } } } }
+            });
+
+            const ctxLatency = document.getElementById('latencyChart').getContext('2d');
+            latencyChartInstance = new Chart(ctxLatency, {
+                type: 'line',
+                data: {
+                    labels: ['10:40', '10:41', '10:42', '10:43', '10:44', '10:45'],
+                    datasets: [{
+                        label: 'Latency (ms)',
+                        data: [5.1, 4.8, 6.2, 4.0, 4.5, 4.2],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#334155' } }, x: { grid: { display: false } } } }
+            });
+        }
+
+        // --- CONNECTIVITY TESTING SIMULATION ---
+        function executeConnectivityTest() {
+            const source = document.getElementById('ping-source').value;
+            const dest = document.getElementById('ping-dest').value;
+            const mode = document.getElementById('ping-mode').value;
+            const output = document.getElementById('connectivity-output');
+
+            output.innerHTML = `<span class="text-cyan-400">Initializing ${mode.toUpperCase()} test from ${source} to ${dest}...</span>\n`;
+
+            setTimeout(() => {
+                // Check if Guest trying to reach Server (ACL block condition)
+                if(source === 'Guest' && dest.startsWith('192.168.60.')) {
+                    output.innerHTML += `<span class="text-amber-400">Inspecting Core Router Extended ACL 100 rules...</span>\n`;
+                    setTimeout(() => {
+                        output.innerHTML += `<span class="text-red-400">ACCESS DENIED: Packet matching deny rule in ACL 100 (Guest Wi-Fi to Server Subnet).</span>\n`;
+                        output.innerHTML += `<span class="text-red-500 font-bold">Request Timed Out. 0% success rate (100% packet loss).</span>`;
+                    }, 500);
+                    return;
+                }
+
+                if(linkSevered && source === 'Admin') {
+                    output.innerHTML += `<span class="text-red-400">Error: Link down on Admin Switch interface. No route to host.</span>\n`;
+                    return;
+                }
+
+                if(mode === 'ping') {
+                    output.innerHTML += `Pinging ${dest} with 32 bytes of data:\n`;
+                    for(let i=1; i<=4; i++) {
+                        output.innerHTML += `<span class="text-emerald-400">Reply from ${dest}: bytes=32 time=3ms TTL=63</span>\n`;
+                    }
+                    output.innerHTML += `<span class="text-white font-bold">\nPing statistics for ${dest}: Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)</span>`;
+                } else {
+                    output.innerHTML += `Tracing route to ${dest} over a maximum of 30 hops:\n`;
+                    output.innerHTML += `  1    <1 ms    <1 ms    <1 ms  192.168.${source === 'Admin' ? '10' : '20'}.1\n`;
+                    output.innerHTML += `  2     2 ms     2 ms     2 ms  192.168.60.1 (Core Gateway)\n`;
+                    output.innerHTML += `  3     4 ms     3 ms     3 ms  ${dest}\n`;
+                    output.innerHTML += `<span class="text-emerald-400 font-bold">\nTrace complete. Successful route validation.</span>`;
+                }
+            }, 600);
+        }
+
+        // --- UTILS ---
+        function copyCode(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text);
+            showToast("Cisco IOS configuration copied to clipboard!");
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-5 right-5 z-50 bg-slate-900 border border-cyan-500/50 text-cyan-300 text-xs font-mono px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-2 animate-bounce';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-cyan-400"></i><span>${msg}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function triggerGlobalSim() {
+            showToast("Running stress test across all 8 department VLANs...");
+            campusData.logs.unshift({ time: new Date().toLocaleTimeString(), type: "INFO", message: "STRESS TEST: All 38 devices responded with 0% packet loss." });
+            renderEventLogs();
+        }
+
+        function clearSystemLogs() {
+            campusData.logs = [];
+            renderEventLogs();
+            showToast("Event logs cleared.");
+        }
+
+        function resetSimulationState() {
+            linkSevered = false;
+            renderTopologySVG();
+            showToast("Simulation state successfully reset.");
+        }
+
+        function downloadReport() {
+            const reportContent = `CAMPUS AREA NETWORK PROJECT REPORT\nTitle: Campus Area Network Using Cisco Packet Tracer\nCourse: B.Tech Cyber Security PBL\n--------------------------------------------------\n1. ABSTRACT\nThis project demonstrates the complete design, configuration, and monitoring of an enterprise-grade campus network. It integrates 8 isolated departments (VLAN 10-80), Inter-VLAN routing, DHCP, and ACL security.\n\n2. IP ADDRESSING & VLAN TABLE\n- Admin (VLAN 10): 192.168.10.0/24\n- CS Dept (VLAN 20): 192.168.20.0/24\n- Cyber Sec (VLAN 30): 192.168.30.0/24\n- Library (VLAN 40): 192.168.40.0/24\n- Faculty (VLAN 50): 192.168.50.0/24\n- Server Room (VLAN 60): 192.168.60.0/24\n- Student Wi-Fi (VLAN 70): 192.168.70.0/24\n- Labs (VLAN 80): 192.168.80.0/24\n\n3. CONCLUSION\nSuccessfully simulated and verified via CampusNet Web Dashboard and Cisco Packet Tracer (.pkt).`;
+            const blob = new Blob([reportContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'CampusNet_PBL_Project_Report.txt';
+            a.click();
+            showToast("Project report downloaded successfully.");
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notif-dropdown');
+            dropdown.classList.toggle('hidden');
+            const list = document.getElementById('notif-list');
+            list.innerHTML = '';
+            campusData.logs.slice(0, 5).forEach(l => {
+                list.innerHTML += `<div class="p-2 rounded bg-slate-900 border border-bordercol"><span class="text-slate-500">[${l.time}]</span> ${l.message}</div>`;
+            });
+        }
+
+        function clearAlerts() {
+            document.getElementById('notif-badge').style.display = 'none';
+            document.getElementById('notif-list').innerHTML = '<div class="text-slate-500 text-center py-2">No unread alerts</div>';
+        }
+    </script>
+</body>
+</html>
